@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.ververica.cdc.connectors.mysql.debezium.DebeziumUtils.currentBinlogOffset;
+import static com.ververica.cdc.connectors.mysql.table.StartupMode.SPECIFIC_OFFSETS;
 
 /** A {@link MySqlSplitAssigner} which only read binlog from current binlog position. */
 public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
@@ -129,13 +129,28 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private MySqlBinlogSplit createBinlogSplit() {
         try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
-            return new MySqlBinlogSplit(
-                    BINLOG_SPLIT_ID,
-                    currentBinlogOffset(jdbc),
-                    BinlogOffset.NO_STOPPING_OFFSET,
-                    new ArrayList<>(),
-                    new HashMap<>(),
-                    0);
+
+            switch (sourceConfig.getStartupOptions().startupMode) {
+                case SPECIFIC_OFFSETS:
+                    return new MySqlBinlogSplit(
+                            BINLOG_SPLIT_ID,
+                            new BinlogOffset(
+                                    sourceConfig.getStartupOptions().specificOffsetFile,
+                                    sourceConfig.getStartupOptions().specificOffsetPos),
+                            BinlogOffset.NO_STOPPING_OFFSET,
+                            new ArrayList<>(),
+                            new HashMap<>(),
+                            0);
+                default:
+                    return new MySqlBinlogSplit(
+                            BINLOG_SPLIT_ID,
+                            DebeziumUtils.currentBinlogOffset(jdbc),
+                            BinlogOffset.NO_STOPPING_OFFSET,
+                            new ArrayList<>(),
+                            new HashMap<>(),
+                            0);
+            }
+
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
         }
