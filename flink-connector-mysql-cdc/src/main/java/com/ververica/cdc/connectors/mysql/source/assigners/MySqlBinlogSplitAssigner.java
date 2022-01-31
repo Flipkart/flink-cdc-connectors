@@ -129,27 +129,23 @@ public class MySqlBinlogSplitAssigner implements MySqlSplitAssigner {
 
     private MySqlBinlogSplit createBinlogSplit() {
         try (JdbcConnection jdbc = DebeziumUtils.openJdbcConnection(sourceConfig)) {
-
+            BinlogOffset startOffset = null;
             switch (sourceConfig.getStartupOptions().startupMode) {
                 case SPECIFIC_OFFSETS:
-                    return new MySqlBinlogSplit(
-                            BINLOG_SPLIT_ID,
-                            new BinlogOffset(
-                                    sourceConfig.getStartupOptions().specificOffsetFile,
-                                    sourceConfig.getStartupOptions().specificOffsetPos),
-                            BinlogOffset.NO_STOPPING_OFFSET,
-                            new ArrayList<>(),
-                            new HashMap<>(),
-                            0);
+                    startOffset = new BinlogOffset(sourceConfig.getStartupOptions().specificOffsetFile,
+                            sourceConfig.getStartupOptions().specificOffsetPos);
+                    break;
                 default:
-                    return new MySqlBinlogSplit(
-                            BINLOG_SPLIT_ID,
-                            DebeziumUtils.currentBinlogOffset(jdbc),
-                            BinlogOffset.NO_STOPPING_OFFSET,
-                            new ArrayList<>(),
-                            new HashMap<>(),
-                            0);
+                    startOffset = DebeziumUtils.currentBinlogOffset(jdbc);
             }
+
+            return new MySqlBinlogSplit(
+                    BINLOG_SPLIT_ID,
+                    startOffset,
+                    BinlogOffset.NO_STOPPING_OFFSET,
+                    new ArrayList<>(),
+                    new HashMap<>(),
+                    0);
 
         } catch (Exception e) {
             throw new FlinkRuntimeException("Read the binlog offset error", e);
